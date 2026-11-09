@@ -482,6 +482,72 @@ for step in 1..max_steps:
 
 ---
 
+## 11.1 Система аккаунтов (мультиаккаунт)
+
+Вдохновлено `jlcodes99/cockpit-tools`: plaintext-индекс + зашифрованные
+детали на каждый аккаунт. Реализация — `internal/accounts`.
+
+### Файлы (`~/.harness` или `HARNESS_HOME`)
+
+```
+~/.harness/
+├── accounts.json                     # индекс: метаданные без секретов
+├── accounts/<id>.json                # детали аккаунта, AES-256-GCM
+├── secure-account-storage.key        # ключ шифрования, base64(32 bytes), 0600
+└── accounts.lock                     # межпроцессная блокировка
+```
+
+### Модель `Account`
+
+`id`, `provider`, `label`, `email`, `api_key`, `base_url`, `tags`, `notes`,
+`disabled`, `disabled_reason`, `disabled_at`, `cooldown_until`, `created_at`,
+`last_used`, `quota` (models[]/subscription).
+
+`api_key` и прочие детали лежат **только** в зашифрованном файле.
+В `accounts.json` — `Summary` без секретов.
+
+### Шифрование
+
+- AES-256-GCM, случайный nonce 12 байт на запись.
+- Ключ создаётся один раз через `O_CREATE|O_EXCL`, читается из base64.
+- Запись атомарная: temp-файл → `Sync` → `Rename`.
+- Поддерживается чтение legacy plaintext-файлов (миграция при следующей записи).
+
+### Ротация и здоровье
+
+- `Next(provider)` выбирает активный аккаунт, не на кулдауне, наименее
+  использованный (`last_used`), и сразу помечает его использованным.
+- `ReportError(id, status, msg)`:
+  - `401/403` → disable с причиной;
+  - `429` → кулдаун 60s;
+  - `5xx` → кулдаун 10s.
+- `SetDisabled`, `SetCurrent`/`Current` — ручное управление.
+
+### CLI
+
+```powershell
+harness accounts add -provider deepseek -label work -key-env DEEPSEEK_KEY_1
+harness accounts list -provider deepseek
+harness accounts use <id>
+harness accounts current -provider deepseek
+harness accounts disable -reason "revoked" <id>
+harness accounts enable <id>
+harness accounts remove <id>
+```
+
+Ключ лучше передавать через `-key-env` (читается из окружения), а не `-key`,
+чтобы он не оседал в истории shell.
+
+### Интеграция с провайдером
+
+`buildProvider` в `cmd/harness`:
+1. для `openai_compatible`/`codex_proxy` пробует `accounts.Next(provider)`;
+2. если аккаунт найден — берёт его `api_key` и опциональный `base_url`;
+3. иначе — fallback на ключ из `api_key_env`.
+Флаг `-account <id>` позволяет выбрать аккаунт вручную.
+
+---
+
 ## 12. TUI (Bubbletea)
 
 MVP-экран:
@@ -504,17 +570,25 @@ MVP-экран:
 - [x] интерфейсы `Provider`, `Tool`, `Message`
 - [x] `ParseModelRef("provider:model")` и `ProviderConfig.ResolveKeys()` (пул ключей)
 
-### Milestone 1 — один провайдер, один тул
-- [ ] `openai.go` (стрим, текст)
-- [ ] `mock.go` + тесты роутера
-- [ ] `read_file` + `shell`
-- [ ] headless CLI: `harness "прочитай main.go"`
+### Milestone 1 — один провайдер, один тул ✅
+- [x] `openai.go` (SSE-стрим: текст, reasoning, tool calls, usage)
+- [x] `mock.go` + `factory.go`
+- [x] `read_file` + `shell`
+- [x] headless CLI: `harness "прочитай main.go"`
+- [x] `engine.go` — агентный цикл с лимитом шагов
 
 ### Milestone 2 — tool calls
-- [ ] парсинг tool_calls в стриме
-- [ ] реестр тулов + валидация JSON Schema
-- [ ] агентный цикл с лимитом шагов
+- [x] парсинг tool_calls в стриме
+- [x] реестр тулов
+- [x] агентный цикл с лимитом шагов
+- [ ] валидация аргументов по JSON Schema
 - [ ] `write_file`
+
+### Milestone 2.5 — аккаунты ✅
+- [x] `internal/accounts`: индекс + AES-256-GCM детали
+- [x] ротация, disable/cooldown, `ReportError`
+- [x] CLI `harness accounts ...`
+- [x] интеграция с `buildProvider`
 
 ### Milestone 3 — качество правок
 - [ ] `hashline_edit` + хэши в `read_file`
