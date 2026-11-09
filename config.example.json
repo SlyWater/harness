@@ -1,0 +1,40 @@
+{
+  "defaults": {
+    "thinker": "openai:gpt-4o",
+    "worker": "deepseek:deepseek-chat",
+    "max_steps": 25,
+    "max_tokens": 8192,
+    "temperature": 0.2
+  },
+  "providers": {
+    "openai": {
+      "type": "openai_compatible",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY"
+    },
+    "deepseek": {
+      "type": "openai_compatible",
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "api_key_envs": ["DEEPSEEK_KEYS_FARM"]
+    },
+    "openrouter": {
+      "type": "openai_compatible",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY"
+    },
+    "gemini": {
+      "type": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "api_key_env": "GEMINI_API_KEY"
+    },
+    "codex": {
+      "type": "codex_proxy",
+      "base_url": "http://127.0.0.1:8787/v1",
+      "api_key_env": "CODEX_PROXY_TOKEN"
+    }
+  },
+  "router": {
+    "fallback": ["deepseek", "openrouter", "gemini"]
+  }
+}

@@ -1,0 +1,24 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+harness
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Local config & sessions
+config.json
+*.local.json
+.harness/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
